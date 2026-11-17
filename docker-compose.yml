@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7-alpine
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: fraud, POSTGRES_PASSWORD: fraud, POSTGRES_DB: fraud }
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment: &env
+      DATABASE_URL: postgresql+psycopg2://fraud:fraud@db/fraud
+      REDIS_URL: redis://redis:6379/0
+      USE_CELERY: "1"
+      JWT_SECRET: change-me
+    depends_on: [redis, db]
+  worker:
+    build: .
+    command: celery -A fraud.tasks worker -l info
+    environment: *env
+    depends_on: [redis]
+  dashboard:
+    build: .
+    command: streamlit run fraud/dashboard.py --server.port 8501 --server.address 0.0.0.0
+    ports: ["8501:8501"]
+    environment: { API_URL: "http://api:8000" }
+    depends_on: [api]
